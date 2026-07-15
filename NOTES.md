@@ -4,7 +4,7 @@
 4. If the receiver detects a gap in sequence numbers, it immediately issues a 4-byte NACK back to the sender.
 5. To handle NACK loss, the receiver runs a periodic check every 10ms to re-send NACKs for unrecovered packets that have been missing for more than 40ms.
 6. This ARQ approach achieves 100% reliability against the required loss profiles while maintaining an extremely low bandwidth overhead (~1.10x).
-7. The delay_ms we should grade at is 200 ms.
+7. The delay_ms we should grade at is 100 ms.
 8. The design breaks if the network drops packets for longer than the history buffer (which is practically impossible at ~65k packets).
-9. It also breaks if the network's worst-case round-trip-time (RTT) plus jitter consistently exceeds the 200ms `delay_ms` deadline, causing packets to arrive too late.
+9. It also breaks if the network's worst-case round-trip-time (RTT) plus jitter consistently exceeds the 100ms `delay_ms` deadline, causing packets to arrive too late.
 10. Finally, a complete disconnection or continuous burst loss exceeding the grading timeout will naturally cause a failure.
