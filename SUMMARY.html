@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Architecture Summary</title>
+<style>
+body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }
+h1, h2 { color: #333; }
+code { background: #eee; padding: 2px 4px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<h1>The Flaky Network: Architecture Summary</h1>
+
+<h2>1. Overview</h2>
+<p>The system is built on a custom <b>Selective Repeat ARQ (Automatic Repeat reQuest)</b> protocol over UDP. Given the strict bandwidth overhead constraint (&le; 2.0x), aggressive Forward Error Correction (FEC) (such as packing redundancy into every packet) was mathematically infeasible. Instead, the architecture focuses on a lightweight NACK-based feedback loop that requests retransmissions only when packets are definitively dropped.</p>
+
+<h2>2. Sender Architecture</h2>
+<p>The sender acts as a fast-forwarder with a memory buffer. It maintains a ring buffer (<code>history[65536]</code>) holding previously sent payloads. The sender multiplexes using <code>select()</code> to monitor two UDP sockets non-blockingly:</p>
+<ul>
+<li><b>Source Socket:</b> Forwards incoming 164-byte packets (4-byte sequence + 160-byte payload) immediately to the relay network, while storing a copy in the history buffer.</li>
+<li><b>Feedback Socket:</b> Listens for 4-byte NACKs containing sequence numbers. Upon receipt, the sender instantly retrieves the corresponding payload from the history buffer and retransmits it.</li>
+</ul>
+
+<h2>3. Receiver Architecture</h2>
+<p>The receiver's primary goal is to minimize playout delay. It does this by forwarding valid packets to the player immediately rather than attempting to enforce a strict playout clock. It uses a boolean array to track which sequence numbers have been received and tracks the <code>highest_seq</code> seen so far.</p>
+<p>When a packet arrives:</p>
+<ol>
+<li>The receiver checks if the sequence number is new. If it is, the packet is instantly sent to the player.</li>
+<li>The receiver updates its <code>highest_seq</code>.</li>
+<li>The receiver identifies any sequence gaps (missing frames between the old and new <code>highest_seq</code>) and immediately dispatches a 4-byte NACK to the feedback path.</li>
+</ol>
+<p><b>Periodic Re-NACKing:</b> To ensure reliability against lost NACKs (since the feedback path also traverses the flaky network), the receiver utilizes a timed select loop (10ms timeout). Every 10ms, it scans the recent sequence space. If a packet has been missing for over 40ms (an estimated safe RTT), a duplicate NACK is dispatched.</p>
+
+<h2>4. Design Choices & Tradeoffs</h2>
+<ul>
+<li><b>No FEC:</b> Avoided FEC completely to easily pass the 2.0x bandwidth budget (our overhead sits around 1.10x). The tradeoff is a reliance on the network's Round Trip Time (RTT), necessitating a slightly higher but still generous <code>delay_ms</code> of 200.</li>
+<li><b>Raw 4-byte NACKs:</b> Minimized feedback bandwidth by sending only the 4-byte sequence number as the payload for NACKs.</li>
+<li><b>Cross-Platform Polling:</b> Switched to robust <code>select()</code> loops to ensure 100% compatibility across POSIX (Linux/macOS/WSL) and Windows (Winsock2) environments.</li>
+</ul>
+
+</body>
+</html>
