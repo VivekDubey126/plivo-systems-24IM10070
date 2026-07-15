@@ -1,10 +1,12 @@
-1. The design implements a Selective Repeat ARQ (Automatic Repeat reQuest) protocol where the receiver proactively NACKs missing sequence numbers.
-2. The sender maintains a history ring-buffer of up to 65,536 sent frames, forwarding packets to the relay instantly and serving retransmission requests concurrently.
-3. The receiver forwards valid, in-order or out-of-order packets straight to the playout endpoint to minimize any jitter buffering delay.
-4. If the receiver detects a gap in sequence numbers, it immediately issues a 4-byte NACK back to the sender.
-5. To handle NACK loss, the receiver runs a periodic check every 10ms to re-send NACKs for unrecovered packets that have been missing for more than 40ms.
-6. This ARQ approach achieves 100% reliability against the required loss profiles while maintaining an extremely low bandwidth overhead (~1.10x).
-7. The delay_ms we should grade at is 75 ms.
-8. The design breaks if the network drops packets for longer than the history buffer (which is practically impossible at ~65k packets).
-9. It also breaks if the network's worst-case round-trip-time (RTT) plus jitter consistently exceeds the 75ms `delay_ms` deadline, causing packets to arrive too late.
-10. Finally, a complete disconnection or continuous burst loss exceeding the grading timeout will naturally cause a failure.
+# NOTES
+
+1. The architecture is a **Hybrid FEC + NACK** system implemented in C++ with zero dynamic memory allocation in the critical receive path.
+2. Every UDP packet sent by the sender carries both the current frame **i** and the previous frame **i-1** (328 bytes total), consuming the full 2.0× bandwidth budget in exchange for instant single-packet-loss recovery.
+3. The receiver uses a **1024-slot pre-allocated circular array** indexed by `seq & 1023`; there are no heap allocations, hash maps, or trees in the hot path.
+4. **Single-packet losses** are recovered in zero extra milliseconds — the next arriving packet carries the missing payload as its FEC piggyback.
+5. **Burst losses** (two or more consecutive drops, where FEC fails) trigger an immediate 4-byte NACK to the relay feedback port; the sender retransmits from its own 1024-slot ring buffer within microseconds.
+6. NACKs are retried every **30 ms** if the missing frame is still absent, ensuring eventual delivery even if the NACK itself is dropped.
+7. The **theoretical optimal delay_ms** this design can handle is approximately **40–60 ms** on Profile A (where maximum one-way jitter is ~20 ms), because a single NACK RTT is the worst-case recovery path.
+8. On Profile B (higher jitter / drop rate), a practical lower bound is around **70–80 ms** before the burst-loss recovery window begins to be violated.
+9. The design will **break** under sustained burst losses longer than ~3 consecutive packets at the maximum jitter spike, because a second NACK cycle would be needed but may exceed the deadline window.
+10. It will also fail if the relay's one-way delay exceeds `delay_ms / 2`, as no amount of FEC or NACK can recover a frame that physically arrives after its deadline.

@@ -1,17 +1,23 @@
-CC ?= gcc
-CFLAGS ?= -O2 -Wall
+CXX      = g++
+CXXFLAGS = -O3 -std=c++17 -Wall -Wextra
 
 ifeq ($(OS),Windows_NT)
-    LDFLAGS += -lws2_32
+LDFLAGS = -lws2_32
+EXT     = .exe
+else
+LDFLAGS =
+EXT     =
 endif
 
-all: sender receiver
+all: sender$(EXT) receiver$(EXT)
 
-sender: sender.c
-	$(CC) $(CFLAGS) -o sender sender.c $(LDFLAGS)
+sender$(EXT): sender.cpp
+	$(CXX) $(CXXFLAGS) -o sender$(EXT) sender.cpp $(LDFLAGS)
 
-receiver: receiver.c
-	$(CC) $(CFLAGS) -o receiver receiver.c $(LDFLAGS)
+receiver$(EXT): receiver.cpp
+	$(CXX) $(CXXFLAGS) -o receiver$(EXT) receiver.cpp $(LDFLAGS)
 
 clean:
-	rm -f sender receiver sender.exe receiver.exe
+	rm -f sender$(EXT) receiver$(EXT)
+
+.PHONY: all clean
