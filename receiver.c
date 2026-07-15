@@ -23,7 +23,7 @@
 #define BUF_MASK (BUF - 1)
 #define NACK_COOLDOWN_MS 20
 #define TOKEN_BUCKET_MAX 10.0
-#define TOKEN_RATE       0.03  // 3 NACKs per 100ms allowed
+#define TOKEN_RATE       0.05  // 5 NACKs per 100ms allowed
 
 struct RxSlot {
     uint8_t payload[160];

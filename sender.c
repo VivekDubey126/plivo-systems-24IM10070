@@ -132,8 +132,8 @@ int main() {
                         for (int k = 0; k < 160; k++) xb[k] ^= g_payload[s2][k];
                 }
 
-                // 95% FEC rate (gives ~1.97x overhead)
-                bool send_fec = (seq % 20 != 0); 
+                // 80% FEC rate (gives ~1.82x baseline overhead, huge budget for NACKs)
+                bool send_fec = (seq % 5 != 0); 
                 int  plen     = 164;
                 
                 write_be32(obuf, seq);
